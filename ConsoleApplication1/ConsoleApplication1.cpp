@@ -3,7 +3,7 @@
 #include <cmath>
 #include <array>
 #include "CImg.h"
-#include "advisor-annotate.h" 
+//#include "GSL/include/gsl.h"
 
 #define WIDTH 4096
 #define HEIGHT 2160
@@ -12,15 +12,13 @@
 using namespace cimg_library;
 using namespace std;
 
-int main(int argc, char* argv[])
+void PopulateVignette(float ar[][HEIGHT] )
 {
-    auto ar = new float[WIDTH][HEIGHT];
     int wcenter = WIDTH / 2;
     int hcenter = HEIGHT / 2;
     float smallerdim = (float)min(wcenter, hcenter);
     // Describes the color of the vignette
-    int vignette_color[3] = { 0, 128, 255 };
-    
+
     // The part of the picture that has the vignette gradient. 0 is the center, 1 is the edge of the picture.
     float m = 1;
     float n = 0.5;
@@ -32,11 +30,11 @@ int main(int argc, char* argv[])
         {
             float xd = (float)(i - wcenter);
             float yd = (float)(j - hcenter);
-            
-            auto d = sqrt(xd*xd + yd*yd)/(float)smallerdim; // calc distance & normalize
+
+            auto d = sqrt(xd*xd + yd*yd) / (float)smallerdim; // calc distance & normalize
 
             // Find edges of vignette.
-            auto v = ((d - n)/(m - n))*opacity;
+            auto v = ((d - n) / (m - n))*opacity;
             v = d > n ? v : 0;
             v = d >= m ? opacity : v;
 
@@ -44,6 +42,14 @@ int main(int argc, char* argv[])
             ar[i][j] = v;
         }
     }
+}
+int main(int argc, char* argv[])
+{
+    auto ar = new float[WIDTH][HEIGHT];
+    int vignette_color[3] = { 0, 128, 255 };
+
+    PopulateVignette(ar);
+
     int n_colors = 3;
     CImg<float> visu(WIDTH, HEIGHT, 1, n_colors, 255);
     //visu.fillC(0, 300, 255, 0, 1, 2, 3, 4);
@@ -62,7 +68,6 @@ int main(int argc, char* argv[])
         }
     }
     visu.save("vignette.bmp");
-    delete[] ar;
     return 0;
 }
 
