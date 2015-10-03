@@ -1,0 +1,3 @@
+[submodule "ConsoleApplication1/GSL"]
+	path = ConsoleApplication1/GSL
+	url = git://github.com/Microsoft/GSL
