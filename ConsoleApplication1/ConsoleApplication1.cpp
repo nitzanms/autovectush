@@ -111,7 +111,7 @@ void Saturate(CImg<float> &img, float const sat)
     }
     YCrCb2RGB(img);
 }
-void Contrast(CImg<float> &img, float const gain)
+void Lightness(CImg<float> &img, float const gain)
 {
     RGB2YCbCr(img);
     size_t max_iter = img.width()*img.height();
@@ -123,10 +123,27 @@ void Contrast(CImg<float> &img, float const gain)
     YCrCb2RGB(img);
 }
 
+void ModifyChannel(CImg<float> &img, float multipliers[3])
+{
+    size_t max_iter = img.width()*img.height();
+#pragma ivdep
+    for (size_t i = 0; i < max_iter; i++)
+    {
+        R(img, i) = constrain(R(img, i) * multipliers[0], 0, 255);
+        G(img, i) = constrain(G(img, i) * multipliers[1], 0, 255);
+        B(img, i) = constrain(B(img, i) * multipliers[2], 0, 255);
+    }
+
+}
+
+// Radius is calculated relative to the smaller dimension of the image, eg a radius of 1 will 
+// create a circle with a diameter equal to the smaller image dimension.
+// Opacity is a value between 0 and 1 defining the vignette's maximum opacity, where 0 is transparent and 1 is fully opaque
+
 void ApplyVignette(CImg<float> &img, int vignette_color[3], float outer_radius, float inner_radius, float opacity)
 {
     auto ar = CImg<float>(img.width(), img.height(), 1, 1);
-    PopulateVignette(ar, outer_radius, inner_radius, opacity);
+    PopulateVignette(ar, outer_radius, inner_radius, constrain(opacity, 0, 1));
     int n_colors = img.spectrum();
     //visu.fillC(0, 300, 255, 0, 1, 2, 3, 4);
     size_t image_it = 0;
@@ -150,15 +167,18 @@ void ApplyVignette(CImg<float> &img, int vignette_color[3], float outer_radius, 
 
 int main(int argc, char* argv[])
 {
-    int vignette_color[3] = { 0, 0, 0 };
+    int vignette_color[3] = { 15, 15, 0 };
     //CImg<float> img(WIDTH, HEIGHT, 1, 3, 255);
-    CImg<float> img("lena.bmp");
-    ApplyVignette(img, vignette_color, 1, 0.5, 0.7);
+    CImg<float> img("CatOnFishingBoat.bmp");
 
+    //Lightness(img, 1.5);
+    Saturate(img, 2); 
+    float multipliers[3] = { 1.20, 1.20, 0 };
+    ModifyChannel(img, multipliers);
 
-    Contrast(img, 2.0);
-    Saturate(img, 2.0);
-    img.save("lena_modified.bmp");
+    ApplyVignette(img, vignette_color, 1.25, 0.8, 0.6);
+
+    img.save("cat_modified.bmp");
     return 0;
 }
 
