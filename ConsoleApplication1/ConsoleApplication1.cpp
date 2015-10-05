@@ -43,8 +43,50 @@ void PopulateVignette(float ar[][HEIGHT] )
         }
     }
 }
+
+
+void ModifyImageContrast(CImg<float> img, float r, float g, float b)
+{
+
+}
+
+#define R(img, i) (img[(i)])
+#define G(img, i) (img[(i)+HEIGHT*WIDTH])
+#define B(img, i) (img[(i)+2*HEIGHT*WIDTH])
+
+#define Y(img, i) img[i]
+#define Cr(img, i) img[i+HEIGHT*WIDTH]
+#define Cb(img, i) img[i+2*HEIGHT*WIDTH]
+
+
+void RGB2YCbCr(CImg<float> img)
+{
+    for (size_t i = 0; i < HEIGHT*WIDTH; i++)
+    {
+        // Formula given in https://en.wikipedia.org/wiki/YCbCr#JPEG_conversion
+        Y(img, i) = 0 + 0.299 * R(img, i) + 0.587 * G(img, i) + 0.114 * B(img, i);
+        Cr(img, i) = 0.5*R(img, i) - 0.4187*G(img, i) - 0.0813*B(img, i) + 128;
+        Cb(img, i) = -0.1687*R(img, i) - 0.3313*G(img, i) + 0.5*B(img, i) + 128;
+    }
+}
+
+void YCrCb2RGB(CImg<float> img)
+{
+    for (size_t i = 0; i < HEIGHT*WIDTH; i++)
+    {
+        // Formula given in https://en.wikipedia.org/wiki/YCbCr#JPEG_conversion
+        R(img, i) = Y(img, i) + 1.402*(Cr(img, i) - 128);
+        G(img, i) = Y(img, i) - 0.34414*(Cb(img, i) - 128) - 0.71414*(Cr(img, i) - 128);
+        B(img, i) = Y(img, i) + 1.772*(Cb(img, i) - 128);
+    }
+}
+
 int main(int argc, char* argv[])
 {
+
+    CImg<float> lena("lena.bmp");
+
+    return 0;
     auto ar = new float[WIDTH][HEIGHT];
     int vignette_color[3] = { 0, 128, 255 };
 
