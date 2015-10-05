@@ -44,51 +44,76 @@ void PopulateVignette(float ar[][HEIGHT] )
     }
 }
 
-
-void ModifyImageContrast(CImg<float> img, float r, float g, float b)
-{
-
-}
-
 #define R(img, i) (img[(i)])
 #define G(img, i) (img[(i)+img.width()*img.height()])
 #define B(img, i) (img[(i)+2*img.width()*img.height()])
 
 #define Y(img, i) img[i]
-#define Cr(img, i) img[i+img.width()*img.height()]
-#define Cb(img, i) img[i+2*img.width()*img.height()]
+#define Cb(img, i) img[i+img.width()*img.height()]
+#define Cr(img, i) img[i+2*img.width()*img.height()]
+
+float constrain(float value, float min, float max)
+{
+    value = value > max ? max : value;
+    return value < min ? min : value;
+}
 
 // assumes a flat, 3 color value image.
-void RGB2YCbCr(CImg<float> img)
+void RGB2YCbCr(CImg<float> &img)
 {
     for (size_t i = 0; i < img.width()*img.height(); i++)
     {
-        // Formula given in https://en.wikipedia.org/wiki/YCbCr#JPEG_conversion
-        Y(img, i) = 0 + 0.299 * R(img, i) + 0.587 * G(img, i) + 0.114 * B(img, i);
-        Cr(img, i) = 0.5*R(img, i) - 0.4187*G(img, i) - 0.0813*B(img, i) + 128;
-        Cb(img, i) = -0.1687*R(img, i) - 0.3313*G(img, i) + 0.5*B(img, i) + 128;
+        // Formula given in http://www.w3.org/Graphics/JPEG/jfif3.pdf
+        float Ytemp =   0.299* R(img, i) + 0.587* G(img, i) + 0.114* B(img, i);
+        float Cbtemp = -0.1687*R(img, i) - 0.3313*G(img, i) + 0.5*   B(img, i) + 128;
+        float Crtemp =  0.5*   R(img, i) - 0.4187*G(img, i) - 0.0813*B(img, i) + 128;
+        Y(img, i) = Ytemp;
+        Cb(img, i) = Cbtemp;
+        Cr(img, i) = Crtemp;
     }
 }
 // assumes a flat, 3 color value image.
-void YCrCb2RGB(CImg<float> img)
+void YCrCb2RGB(CImg<float> &img)
 {
     for (size_t i = 0; i < img.width()*img.height(); i++)
     {
-        // Formula given in https://en.wikipedia.org/wiki/YCbCr#JPEG_conversion
-        R(img, i) = Y(img, i) + 1.402*(Cr(img, i) - 128);
-        G(img, i) = Y(img, i) - 0.34414*(Cb(img, i) - 128) - 0.71414*(Cr(img, i) - 128);
-        B(img, i) = Y(img, i) + 1.772*(Cb(img, i) - 128);
+        // Formula given in http://www.w3.org/Graphics/JPEG/jfif3.pdf
+        float Rtemp = constrain(Y(img, i) + 1.402*  (Cr(img, i) - 128),                              0, 255);
+        float Gtemp = constrain(Y(img, i) - 0.71414*(Cr(img, i) - 128) - 0.34414*(Cb(img, i) - 128), 0, 255);
+        float Btemp = constrain(Y(img, i)                              + 1.772  *(Cb(img, i) - 128), 0, 255);
+        R(img, i) = Rtemp;
+        G(img, i) = Gtemp;
+        B(img, i) = Btemp;
     }
 }
+
+// sat = 0 will result in B&W
+// 0 < sat < 1 will result in lower saturation
+// sat = 1 will result in the same image.
+// 1 < sat will result in higher saturation
+void Saturate(CImg<float> &img, float const sat)
+{
+    RGB2YCbCr(img);
+    for (size_t i = 0; i < img.width()*img.height(); i++)
+    {
+        Cb(img, i) = constrain((sat * (Cb(img, i) - 128) + 128), float(0.0), float(255.0));
+        Cr(img, i) = constrain((sat * (Cr(img, i) - 128) + 128), (float)0.0, (float)255.0);
+    }
+    YCrCb2RGB(img);
+}
+void Contrast(CImg<float> &img, float const gain)
+{
+    RGB2YCbCr(img);
+    for (size_t i = 0; i < img.width()*img.height(); i++)
+    {
+        Y(img, i) = constrain(Y(img, i)*gain, 0, 255);
+    }
+    YCrCb2RGB(img);
+}
+
 
 int main(int argc, char* argv[])
 {
-
-    CImg<float> lena("lena.bmp");
-    RGB2YCbCr(lena);
-    YCrCb2RGB(lena);
-    lena.save("lena_modified.bmp");
-    return 0;
     auto ar = new float[WIDTH][HEIGHT];
     int vignette_color[3] = { 0, 128, 255 };
 
@@ -111,6 +136,9 @@ int main(int argc, char* argv[])
             }
         }
     }
+
+    Contrast(visu, 2.0);
+    Saturate(visu, 2.0);
     visu.save("vignette.bmp");
     return 0;
 }
