@@ -12,34 +12,37 @@
 using namespace cimg_library;
 using namespace std;
 
-void PopulateVignette(float ar[][HEIGHT] )
+// Outer and inner specify the radius of the vignette, relative to the smaller dimension of the 
+// image (1 means the radius is the same as the smaller dimension)
+void PopulateVignette(CImg<float> &ar, float outer, float inner, float opacity)
 {
-    int wcenter = WIDTH / 2;
-    int hcenter = HEIGHT / 2;
+    float wcenter = ar.width() / 2;
+    float hcenter = ar.height() / 2;
     float smallerdim = (float)min(wcenter, hcenter);
     // Describes the color of the vignette
 
     // The part of the picture that has the vignette gradient. 0 is the center, 1 is the edge of the picture.
-    float m = 1;
-    float n = 0.5;
+    float m = outer;
+    float n = inner;
     // Maximum opacity of vignette.
-    float opacity = 0.7;
-    for (int j = 0; j < HEIGHT; j++)
+    size_t hmax = ar.height();
+    size_t wmax = ar.width();
+    for (size_t j = 0; j < hmax; j++)
     {
-        for (int i = 0; i < WIDTH; i++)
+        for (size_t i = 0; i < wmax; i++)
         {
-            float xd = (float)(i - wcenter);
-            float yd = (float)(j - hcenter);
+            float xd = (i - wcenter);
+            float yd = (j - hcenter);
 
             auto d = sqrt(xd*xd + yd*yd) / (float)smallerdim; // calc distance & normalize
 
-            // Find edges of vignette.
+            // Find edges of vignette radii.
             auto v = ((d - n) / (m - n))*opacity;
             v = d > n ? v : 0;
             v = d >= m ? opacity : v;
 
             // Populate vignette
-            ar[i][j] = v;
+            ar(i, j) = v;
         }
     }
 }
@@ -61,7 +64,9 @@ float constrain(float value, float min, float max)
 // assumes a flat, 3 color value image.
 void RGB2YCbCr(CImg<float> &img)
 {
-    for (size_t i = 0; i < img.width()*img.height(); i++)
+    size_t max_iter = img.width()*img.height();
+#pragma ivdep
+    for (size_t i = 0; i < max_iter; i++)
     {
         // Formula given in http://www.w3.org/Graphics/JPEG/jfif3.pdf
         float Ytemp =   0.299* R(img, i) + 0.587* G(img, i) + 0.114* B(img, i);
@@ -75,7 +80,9 @@ void RGB2YCbCr(CImg<float> &img)
 // assumes a flat, 3 color value image.
 void YCrCb2RGB(CImg<float> &img)
 {
-    for (size_t i = 0; i < img.width()*img.height(); i++)
+    size_t max_iter = img.width()*img.height();
+#pragma ivdep
+    for (size_t i = 0; i < max_iter; i++)
     {
         // Formula given in http://www.w3.org/Graphics/JPEG/jfif3.pdf
         float Rtemp = constrain(Y(img, i) + 1.402*  (Cr(img, i) - 128),                              0, 255);
@@ -94,7 +101,10 @@ void YCrCb2RGB(CImg<float> &img)
 void Saturate(CImg<float> &img, float const sat)
 {
     RGB2YCbCr(img);
-    for (size_t i = 0; i < img.width()*img.height(); i++)
+    size_t max_iter = img.width()*img.height();
+#pragma ivdep
+
+    for (size_t i = 0; i < max_iter; i++)
     {
         Cb(img, i) = constrain((sat * (Cb(img, i) - 128) + 128), float(0.0), float(255.0));
         Cr(img, i) = constrain((sat * (Cr(img, i) - 128) + 128), (float)0.0, (float)255.0);
@@ -104,42 +114,51 @@ void Saturate(CImg<float> &img, float const sat)
 void Contrast(CImg<float> &img, float const gain)
 {
     RGB2YCbCr(img);
-    for (size_t i = 0; i < img.width()*img.height(); i++)
+    size_t max_iter = img.width()*img.height();
+#pragma ivdep
+    for (size_t i = 0; i < max_iter; i++)
     {
         Y(img, i) = constrain(Y(img, i)*gain, 0, 255);
     }
     YCrCb2RGB(img);
 }
 
-
-int main(int argc, char* argv[])
+void ApplyVignette(CImg<float> &img, int vignette_color[3], float outer_radius, float inner_radius, float opacity)
 {
-    auto ar = new float[WIDTH][HEIGHT];
-    int vignette_color[3] = { 0, 128, 255 };
-
-    PopulateVignette(ar);
-
-    int n_colors = 3;
-    CImg<float> visu(WIDTH, HEIGHT, 1, n_colors, 255);
+    auto ar = CImg<float>(img.width(), img.height(), 1, 1);
+    PopulateVignette(ar, outer_radius, inner_radius, opacity);
+    int n_colors = img.spectrum();
     //visu.fillC(0, 300, 255, 0, 1, 2, 3, 4);
     size_t image_it = 0;
-    float* image_data = visu.data();
+    float* image_data = img.data();
+    size_t wmax = img.width();
+    size_t hmax = img.height();
     for (int color = 0; color < n_colors; color++)
     {
         auto color_value = vignette_color[color];
-        for (int j = 0; j < HEIGHT; j++)
+        for (int j = 0; j < hmax; j++)
         {
-            for (int i = 0; i < WIDTH; i++)
+            for (int i = 0; i < wmax; i++)
             {
-                image_data[image_it] = (ar[i][j]*color_value + (1-ar[i][j])*image_data[image_it]);
+                image_data[image_it] = (ar(i, j) * color_value + (1 - ar(i,j))*image_data[image_it]);
                 image_it++;
             }
         }
     }
 
-    Contrast(visu, 2.0);
-    Saturate(visu, 2.0);
-    visu.save("vignette.bmp");
+}
+
+int main(int argc, char* argv[])
+{
+    int vignette_color[3] = { 0, 0, 0 };
+    //CImg<float> img(WIDTH, HEIGHT, 1, 3, 255);
+    CImg<float> img("lena.bmp");
+    ApplyVignette(img, vignette_color, 1, 0.5, 0.7);
+
+
+    Contrast(img, 2.0);
+    Saturate(img, 2.0);
+    img.save("lena_modified.bmp");
     return 0;
 }
 
