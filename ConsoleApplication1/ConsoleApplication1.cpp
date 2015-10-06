@@ -69,9 +69,9 @@ void RGB2YCbCr(CImg<float> &img)
     for (size_t i = 0; i < max_iter; i++)
     {
         // Formula given in http://www.w3.org/Graphics/JPEG/jfif3.pdf
-        float Ytemp =   0.299* R(img, i) + 0.587* G(img, i) + 0.114* B(img, i);
-        float Cbtemp = -0.1687*R(img, i) - 0.3313*G(img, i) + 0.5*   B(img, i) + 128;
-        float Crtemp =  0.5*   R(img, i) - 0.4187*G(img, i) - 0.0813*B(img, i) + 128;
+        float Ytemp =   0.299f* R(img, i) + 0.587f* G(img, i) + 0.114f* B(img, i);
+        float Cbtemp = -0.1687f*R(img, i) - 0.3313f*G(img, i) + 0.5f*   B(img, i) + 128.0f;
+        float Crtemp =  0.5f*   R(img, i) - 0.4187f*G(img, i) - 0.0813f*B(img, i) + 128.0f;
         Y(img, i) = Ytemp;
         Cb(img, i) = Cbtemp;
         Cr(img, i) = Crtemp;
@@ -85,9 +85,9 @@ void YCrCb2RGB(CImg<float> &img)
     for (size_t i = 0; i < max_iter; i++)
     {
         // Formula given in http://www.w3.org/Graphics/JPEG/jfif3.pdf
-        float Rtemp = constrain(Y(img, i) + 1.402*  (Cr(img, i) - 128),                              0, 255);
-        float Gtemp = constrain(Y(img, i) - 0.71414*(Cr(img, i) - 128) - 0.34414*(Cb(img, i) - 128), 0, 255);
-        float Btemp = constrain(Y(img, i)                              + 1.772  *(Cb(img, i) - 128), 0, 255);
+        float Rtemp = constrain(Y(img, i) + 1.402f  *  (Cr(img, i) - 128.0f),                             0, 255);
+        float Gtemp = constrain(Y(img, i) - 0.71414f*(Cr(img, i) - 128) - 0.34414f*(Cb(img, i) - 128.0f), 0, 255);
+        float Btemp = constrain(Y(img, i)                               + 1.772f  *(Cb(img, i) - 128.0f), 0, 255);
         R(img, i) = Rtemp;
         G(img, i) = Gtemp;
         B(img, i) = Btemp;
@@ -146,19 +146,23 @@ void ApplyVignette(CImg<float> &img, int vignette_color[3], float outer_radius, 
     PopulateVignette(ar, outer_radius, inner_radius, constrain(opacity, 0, 1));
     int n_colors = img.spectrum();
     //visu.fillC(0, 300, 255, 0, 1, 2, 3, 4);
-    size_t image_it = 0;
+
     float* image_data = img.data();
     size_t wmax = img.width();
     size_t hmax = img.height();
+    size_t image_it = 0;
+    size_t ar_it = 0;
     for (int color = 0; color < n_colors; color++)
     {
         auto color_value = vignette_color[color];
+        ar_it = 0;
         for (int j = 0; j < hmax; j++)
         {
             for (int i = 0; i < wmax; i++)
             {
-                image_data[image_it] = (ar(i, j) * color_value + (1 - ar(i,j))*image_data[image_it]);
+                image_data[image_it] = (ar[ar_it] * color_value + (1 - ar[ar_it])*image_data[image_it]);
                 image_it++;
+                ar_it++;
             }
         }
     }
@@ -169,7 +173,7 @@ int main(int argc, char* argv[])
 {
     int vignette_color[3] = { 15, 15, 0 };
     //CImg<float> img(WIDTH, HEIGHT, 1, 3, 255);
-    CImg<float> img("CatOnFishingBoat.bmp");
+    CImg<float> img("tal.bmp");
 
     //Lightness(img, 1.5);
     Saturate(img, 2); 
